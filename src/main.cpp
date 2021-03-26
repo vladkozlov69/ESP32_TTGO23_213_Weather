@@ -25,8 +25,8 @@
 #include <SPI.h>
 #include <Wire.h>
 #define  ENABLE_GxEPD2_display 0
-#include <GxEPD2_BW.h>
-#include <GxEPD2_3C.h>
+// #include <GxEPD2_BW.h>
+// #include <GxEPD2_3C.h>
 #include <U8g2_for_Adafruit_GFX.h>
 #include "forecast_record.h"
 #include "lang.h"                   // Localisation (English)
