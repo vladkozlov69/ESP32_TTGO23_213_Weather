@@ -43,7 +43,7 @@
 
 enum alignmentType {LEFT, RIGHT, CENTER};
 
-
+#define DONE_PIN 21
 
 uint8_t StartWiFi();
 boolean SetupTime();
@@ -156,6 +156,8 @@ int  SleepTime     = 23; // Sleep after (23+1) 00:00 to save battery power
 
 //#########################################################################################
 void setup() {
+  pinMode(DONE_PIN, OUTPUT);
+  digitalWrite(DONE_PIN, LOW);
   StartTime = millis();
   Serial.begin(115200);
   if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
@@ -179,7 +181,8 @@ void setup() {
       }
     //}
   }
-  BeginSleep();
+  //BeginSleep();
+  digitalWrite(DONE_PIN, HIGH);
 }
 //#########################################################################################
 void loop() { // this will never run!
