@@ -251,7 +251,7 @@ void Draw_Heading_Section() {
 //#########################################################################################
 void Draw_Main_Weather_Section() {
   DisplayWXicon(150, 30, WxConditions[0].Icon, SmallIcon);
-  u8g2Fonts.setFont(u8g2_font_fub17_tf);
+  u8g2Fonts.setFont(u8g2_font_helvB18_tf);
   drawString(3, 25, String(WxConditions[0].Temperature, 1) + "° / " + String(WxConditions[0].Humidity, 0) + "%", LEFT);
 
   u8g2Fonts.setFont(u8g2_font_helvB10_tf);
@@ -279,7 +279,7 @@ void Draw_3hr_Forecast(int x, int y, int index) {
   //drawString(x + 22, y - 20, WxForecast[index].Period.substring(11, 16), CENTER);
   drawString(x + 22, y - 18, String(ConvertUnixTime(WxForecast[index].Dt).substring(0, 5)), CENTER);
   //drawString(x + 3, y + 15, String(WxForecast[index].High, 0) + "°/" + String(WxForecast[index].Low, 0) + "°", LEFT);
-  u8g2Fonts.setFont(u8g2_font_courB14_tf);
+  u8g2Fonts.setFont(u8g2_font_helvB14_tf);
   drawString(x + 22, y + 22, String((WxForecast[index].High + WxForecast[index].Low)/2, 0) + "°", CENTER);
   display.drawLine(x + 50, y - 24, x + 50, y - 24 + 56 , GxEPD_BLACK);
   display.drawLine(x, y - 24 + 56, x + 50, y - 24 + 56 , GxEPD_BLACK);
@@ -834,7 +834,9 @@ void addmoon(int x, int y, int scale, bool IconSize) {
 }
 //#########################################################################################
 void Nodata(int x, int y, bool IconSize, String IconName) {
-  if (IconSize == LargeIcon) u8g2Fonts.setFont(u8g2_font_helvB24_tf); else u8g2Fonts.setFont(u8g2_font_helvB10_tf);
+  if (IconSize == LargeIcon) 
+    u8g2Fonts.setFont(u8g2_font_helvB24_tf); 
+  else u8g2Fonts.setFont(u8g2_font_helvB10_tf);
   drawString(x - 3, y - 8, "?", CENTER);
   u8g2Fonts.setFont(u8g2_font_helvB08_tf);
 }
