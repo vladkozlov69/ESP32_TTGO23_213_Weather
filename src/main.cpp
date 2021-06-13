@@ -275,7 +275,7 @@ void Draw_Main_Weather_Section() {
 // From the lines, looks like 50 wide and 56 high?
 void Draw_3hr_Forecast(int x, int y, int index) {
   DisplayWXicon(x + 26, y + 2, WxForecast[index].Icon, SmallIcon);
-  u8g2Fonts.setFont(u8g2_font_helvB08_tf);
+  u8g2Fonts.setFont(u8g2_font_helvB10_tf);
   //drawString(x + 22, y - 20, WxForecast[index].Period.substring(11, 16), CENTER);
   drawString(x + 22, y - 18, String(ConvertUnixTime(WxForecast[index].Dt).substring(0, 5)), CENTER);
   //drawString(x + 3, y + 15, String(WxForecast[index].High, 0) + "°/" + String(WxForecast[index].Low, 0) + "°", LEFT);
