@@ -184,6 +184,7 @@ void loop() { // this will never run!
 //#########################################################################################
 void BeginSleep() {
   digitalWrite(DONE_PIN, HIGH);
+  delay(200);
   display.powerDown();
   long SleepTimer = (SleepDuration * 60 - ((CurrentMin % SleepDuration) * 60 + CurrentSec)); //Some ESP32 are too fast to maintain accurate time
   esp_sleep_enable_timer_wakeup((SleepTimer+20) * 1000000LL); // Added 20-sec extra delay to cater for slow ESP32 RTC timers
