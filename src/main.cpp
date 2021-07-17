@@ -54,11 +54,6 @@ void BeginSleep();
 boolean UpdateLocalTime();
 void Draw_Heading_Section();
 void Draw_Main_Weather_Section();
-void Draw_Main_Weather_Section();
-void Draw_3hr_Forecast(int x, int y, int index); 
-void Draw_3hr_Forecast(int x, int y, int index);   
-void Draw_3hr_Forecast(int x, int y, int index);   
-void Draw_3hr_Forecast(int x, int y, int index);  
 void Draw_3hr_Forecast(int x, int y, int index);  
 void DisplayAstronomySection(int x, int y); 
 void DrawBattery(int x, int y);
@@ -181,14 +176,15 @@ void setup() {
       }
     //}
   }
-  //BeginSleep();
-  digitalWrite(DONE_PIN, HIGH);
+  BeginSleep();
 }
 //#########################################################################################
 void loop() { // this will never run!
 }
 //#########################################################################################
 void BeginSleep() {
+  digitalWrite(DONE_PIN, HIGH);
+  delay(200);
   display.powerDown();
   long SleepTimer = (SleepDuration * 60 - ((CurrentMin % SleepDuration) * 60 + CurrentSec)); //Some ESP32 are too fast to maintain accurate time
   esp_sleep_enable_timer_wakeup((SleepTimer+20) * 1000000LL); // Added 20-sec extra delay to cater for slow ESP32 RTC timers
@@ -209,16 +205,16 @@ void DisplayWeather() {             // 2.13" e-paper display is 250x122 useable 
   UpdateLocalTime();
   Draw_Heading_Section();           // Top line of the display
   Draw_Main_Weather_Section();      // Centre section of display for Location, temperature, Weather report, Wx Symbol and wind direction
-  //Gak, each forecast is about 45 wide, which means we can fit about 5.5 of them onto our 250 wide screen.
+  //Gak, each forecast is about 50 wide, which means we can fit about 5 of them onto our 250 wide screen.
   // Leaves us a little 25 wide gap on the right - let's see if we can find something to fill that out with.
   //Index from 0, not 1 - gets us more useful 'near' data.
   // For instance, indexing from 1 at 10am got us our first 3h prediction at 15:00, which is a *long* way off.
   // Indexing from 0 made that 12:00, which is much more useful.
-  Draw_3hr_Forecast(0, 96, 0);    // First  3hr forecast box
-  Draw_3hr_Forecast(44, 96, 1);    // Second 3hr forecast box
-  Draw_3hr_Forecast(88, 96, 2);   // Third  3hr forecast box
-  Draw_3hr_Forecast(132, 96, 3);   // Fourth  3hr forecast box
-  Draw_3hr_Forecast(176, 96, 4);   // Fifth 3hr forecast box
+  for (int i = 0; i < 5; i++)
+  {
+    Draw_3hr_Forecast(50 * i, 92, i);
+  }
+
   DisplayAstronomySection(140, 18); // Astronomy section Sun rise/set and Moon phase plus icon
   // Not really enough space for these
   //if (WxConditions[0].Visibility > 0) Visibility(110, 40, String(WxConditions[0].Visibility) + "M");
@@ -255,31 +251,39 @@ void Draw_Heading_Section() {
 }
 //#########################################################################################
 void Draw_Main_Weather_Section() {
-  DisplayWXicon(117, 40, WxConditions[0].Icon, SmallIcon);
-  u8g2Fonts.setFont(u8g2_font_helvB14_tf);
-  drawString(3, 35, String(WxConditions[0].Temperature, 1) + "° / " + String(WxConditions[0].Humidity, 0) + "%", LEFT);
+  DisplayWXicon(150, 30, WxConditions[0].Icon, SmallIcon);
+  u8g2Fonts.setFont(u8g2_font_helvB18_tf);
+  drawString(3, 25, String(WxConditions[0].Temperature, 1) + "° / " + String(WxConditions[0].Humidity, 0) + "%", LEFT);
+
   u8g2Fonts.setFont(u8g2_font_helvB10_tf);
-  //Squeeze in a small wind indication in the space we cannot quite squeeze a 3h prediction into
-  DrawSmallWind(230, 75, WxConditions[0].Winddir, WxConditions[0].Windspeed);
-  //Pressure just getting in the way and very small right now.
-  //DrawPressureTrend(3, 52, WxConditions[0].Pressure, WxConditions[0].Trend);
+  drawString(3, 25 + 14, 
+    "Sun: " 
+      + ConvertUnixTime(WxConditions[0].Sunrise).substring(0, (Units == "M"?5:7)) 
+      + " - " + ConvertUnixTime(WxConditions[0].Sunset).substring(0, (Units == "M"?5:7)), 
+    LEFT);
+  
   u8g2Fonts.setFont(u8g2_font_helvB12_tf);
   String Wx_Description = WxConditions[0].Forecast0;
   if (WxConditions[0].Forecast1 != "") Wx_Description += " & " +  WxConditions[0].Forecast1;
   if (WxConditions[0].Forecast2 != "" && WxConditions[0].Forecast1 != WxConditions[0].Forecast2) Wx_Description += " & " +  WxConditions[0].Forecast2;
-  drawString(2, 62, TitleCase(Wx_Description), LEFT);
-  display.drawLine(0, 72, (5 * 44), 72, GxEPD_BLACK); //Draw width of the 5 weather forcasts
+  Wx_Description += ", " + WindDegToDirection(WxConditions[0].Winddir);
+  Wx_Description += String(WxConditions[0].Windspeed, 0) + (Units == "M" ? " m/s" : " mph");
+  drawString(2, 25+16+14, TitleCase(Wx_Description), LEFT);
+  display.drawLine(0, 68, 250, 68, GxEPD_BLACK); //Draw width of the 5 weather forcasts
 }
 //#########################################################################################
 // ? How 'big' is a weather forecast box??
-// From the lines, looks like 44 wide and 52 high?
+// From the lines, looks like 50 wide and 56 high?
 void Draw_3hr_Forecast(int x, int y, int index) {
-  DisplayWXicon(x + 26, y, WxForecast[index].Icon, SmallIcon);
-  u8g2Fonts.setFont(u8g2_font_helvB08_tf);
-  drawString(x + 8, y - 22, WxForecast[index].Period.substring(11, 16), LEFT);
-  drawString(x + 3, y + 15, String(WxForecast[index].High, 0) + "°/" + String(WxForecast[index].Low, 0) + "°", LEFT);
-  display.drawLine(x + 44, y - 24, x + 44, y - 24 + 52 , GxEPD_BLACK);
-  display.drawLine(x, y - 24 + 52, x + 44, y - 24 + 52 , GxEPD_BLACK);
+  DisplayWXicon(x + 26, y + 2, WxForecast[index].Icon, SmallIcon);
+  u8g2Fonts.setFont(u8g2_font_helvB10_tf);
+  //drawString(x + 22, y - 20, WxForecast[index].Period.substring(11, 16), CENTER);
+  drawString(x + 22, y - 18, String(ConvertUnixTime(WxForecast[index].Dt).substring(0, 5)), CENTER);
+  //drawString(x + 3, y + 15, String(WxForecast[index].High, 0) + "°/" + String(WxForecast[index].Low, 0) + "°", LEFT);
+  u8g2Fonts.setFont(u8g2_font_helvB14_tf);
+  drawString(x + 22, y + 22, String((WxForecast[index].High + WxForecast[index].Low)/2, 0) + "°", CENTER);
+  display.drawLine(x + 50, y - 24, x + 50, y - 24 + 56 , GxEPD_BLACK);
+  display.drawLine(x, y - 24 + 56, x + 50, y - 24 + 56 , GxEPD_BLACK);
 }
 /*void Draw_3hr_Forecast(int x, int y, int index) {
   DisplayWXicon(x, y, WxForecast[index].Icon, SmallIcon);
@@ -291,14 +295,14 @@ void Draw_3hr_Forecast(int x, int y, int index) {
 //#########################################################################################
 void DisplayAstronomySection(int x, int y) {
   u8g2Fonts.setFont(u8g2_font_helvB08_tf);
-  drawString(x, y, ConvertUnixTime(WxConditions[0].Sunrise).substring(0, (Units == "M"?5:7)) + " " + TXT_SUNRISE, LEFT);
-  drawString(x, y + 16, ConvertUnixTime(WxConditions[0].Sunset).substring(0, (Units == "M"?5:7)) + " " + TXT_SUNSET, LEFT);
+  // drawString(x, y, ConvertUnixTime(WxConditions[0].Sunrise).substring(0, (Units == "M"?5:7)) + " " + TXT_SUNRISE, LEFT);
+  // drawString(x, y + 16, ConvertUnixTime(WxConditions[0].Sunset).substring(0, (Units == "M"?5:7)) + " " + TXT_SUNSET, LEFT);
   time_t now = time(NULL);
   struct tm * now_utc = gmtime(&now);
   const int day_utc   = now_utc->tm_mday;
   const int month_utc = now_utc->tm_mon + 1;
   const int year_utc  = now_utc->tm_year + 1900;
-  drawString(x, y + 32, MoonPhase(day_utc, month_utc, year_utc, Hemisphere), LEFT);
+  //drawString(x + 5, y + 32, MoonPhase(day_utc, month_utc, year_utc, Hemisphere), RIGHT);
   DrawMoon(x+50, y-20, day_utc, month_utc, year_utc, Hemisphere);
 }
 //#########################################################################################
@@ -831,7 +835,9 @@ void addmoon(int x, int y, int scale, bool IconSize) {
 }
 //#########################################################################################
 void Nodata(int x, int y, bool IconSize, String IconName) {
-  if (IconSize == LargeIcon) u8g2Fonts.setFont(u8g2_font_helvB24_tf); else u8g2Fonts.setFont(u8g2_font_helvB10_tf);
+  if (IconSize == LargeIcon) 
+    u8g2Fonts.setFont(u8g2_font_helvB24_tf); 
+  else u8g2Fonts.setFont(u8g2_font_helvB10_tf);
   drawString(x - 3, y - 8, "?", CENTER);
   u8g2Fonts.setFont(u8g2_font_helvB08_tf);
 }
