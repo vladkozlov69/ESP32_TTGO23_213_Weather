@@ -169,8 +169,8 @@ void setup() {
       while ((RxWeather == false || RxForecast == false) && Attempts <= 5) { // Try up-to 2 time for Weather and Forecast data
         //if (RxWeather  == false) RxWeather  = obtain_wx_data(client, "weather");
         //if (RxWeather  == false) RxWeather  = obtain_wx_data_accuweather(client, "currentconditions");
-        if (RxWeather  == false) RxWeather = obtain_wx_data_climacell(secureClient, "current,1h", &current_time);
-        if (RxForecast  == false) RxForecast = obtain_wx_data_climacell(secureClient, "1d", &current_time);
+        if (RxWeather  == false) RxWeather = obtain_wx_data_climacell(secureClient, "current,1h", &current_time, 24);
+        if (RxForecast  == false) RxForecast = obtain_wx_data_climacell(secureClient, "1d", &current_time, 24);
 
         //if (RxForecast == false) RxForecast = obtain_wx_data(client, "forecast");
         Attempts++;
