@@ -18,6 +18,7 @@
   See more at http://www.dsbird.org.uk
 */
 
+
 #include "owm_credentials.h"
 #include <ArduinoJson.h>     // https://github.com/bblanchon/ArduinoJson
 #include <WiFi.h>            // Built-in
@@ -37,6 +38,7 @@
 //#include "lang_nl.h"                // Localisation (Dutch)
 //#include "lang_pl.h"                // Localisation (Polish)
 
+#include <NetworkManager.h>
 //#define DRAW_GRID 1   //Help debug layout changes
 #define SCREEN_WIDTH   250
 #define SCREEN_HEIGHT  122
@@ -44,6 +46,11 @@
 enum alignmentType {LEFT, RIGHT, CENTER};
 
 #define DONE_PIN 21
+#define SETUP_PIN 34
+
+#define USE_OWM 1
+//#define USE_CLIMACELL 1
+//#define USE_ACCUWEATHER 1
 
 uint8_t StartWiFi();
 boolean SetupTime();
@@ -92,6 +99,8 @@ void Nodata(int x, int y, bool IconSize, String IconName);
 void drawString(int x, int y, String text, alignmentType alignment);
 void drawStringMaxWidth(int x, int y, unsigned int text_width, String text, alignmentType alignment);
 void InitialiseDisplay();
+
+void setupDeviceSettings();
 
 // Connections for Lilygo TTGO T5 V2.3_2.13 from
 // https://github.com/lewisxhe/TTGO-EPaper-Series#board-pins
@@ -150,12 +159,25 @@ long SleepDuration = 30; // Sleep time in minutes, aligned to the nearest minute
 int  WakeupTime    = 7;  // Don't wakeup until after 07:00 to save battery power
 int  SleepTime     = 23; // Sleep after (23+1) 00:00 to save battery power
 
+Preferences preferences;
+
+NetworkManager nm(&preferences, &Serial);
+
+
 //#########################################################################################
 void setup() {
   pinMode(DONE_PIN, OUTPUT);
+  pinMode(SETUP_PIN, INPUT_PULLUP);
   digitalWrite(DONE_PIN, LOW);
   StartTime = millis();
   Serial.begin(115200);
+
+  if ( true || digitalRead(SETUP_PIN) == LOW)
+  {
+    setupDeviceSettings();
+    ESP.restart();
+  }
+
   //delay(5000);
   if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
     //if ((CurrentHour >= WakeupTime && CurrentHour <= SleepTime)) {
@@ -187,6 +209,7 @@ void setup() {
 }
 //#########################################################################################
 void loop() { // this will never run!
+  nm.loop();  
 }
 //#########################################################################################
 void BeginSleep() {
@@ -896,6 +919,12 @@ void InitialiseDisplay() {
   display.fillScreen(GxEPD_WHITE);
   //display.
   Serial.println("... End InitialiseDisplay");
+}
+
+void setupDeviceSettings()
+{
+  nm.reset();
+  nm.begin();
 }
 
 /*
