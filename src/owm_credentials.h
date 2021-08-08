@@ -48,5 +48,5 @@ const char accuServer[] = "dataservice.accuweather.com";
 
 const char climacellServer[] = "data.climacell.co";
 //const char climacellTimezone[] = "Europe/Chisinau";
-const char climacellFieldsWeather[] = "solarGHI,temperature,temperatureApparent,dewPoint,humidity,windSpeed,windDirection,pressureSurfaceLevel,precipitationIntensity,precipitationProbability,precipitationProbability,visibility,cloudCover,uvIndex,uvHealthConcern,weatherCode";
+const char climacellFieldsWeather[] = "solarGHI,temperature,temperatureApparent,dewPoint,humidity,windSpeed,windDirection,pressureSurfaceLevel,precipitationIntensity,precipitationProbability,visibility,cloudCover,uvIndex,uvHealthConcern,weatherCode";
 const char climacellFieldsAstro[] = "sunriseTime,sunsetTime,moonPhase";
