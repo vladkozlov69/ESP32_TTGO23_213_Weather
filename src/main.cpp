@@ -127,6 +127,7 @@ String version = "6.5";       // Version of this program
 bool    LargeIcon = true, SmallIcon = false;
 #define Large 7    // For best results use odd numbers
 #define Small 3    // For best results use odd numbers
+struct tm current_time;
 String  time_str, date_str; // strings to hold time and date
 int     wifi_signal, CurrentHour = 0, CurrentMin = 0, CurrentSec = 0;
 long    StartTime = 0;
@@ -155,6 +156,7 @@ void setup() {
   digitalWrite(DONE_PIN, LOW);
   StartTime = millis();
   Serial.begin(115200);
+  //delay(5000);
   if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
     //if ((CurrentHour >= WakeupTime && CurrentHour <= SleepTime)) {
       Serial.println("Initialising Display");
@@ -163,9 +165,14 @@ void setup() {
       bool RxWeather = false, RxForecast = false;
       Serial.println("Attempt to get weather");
       WiFiClient client;   // wifi client object
+      WiFiClientSecure secureClient;
       while ((RxWeather == false || RxForecast == false) && Attempts <= 5) { // Try up-to 2 time for Weather and Forecast data
-        if (RxWeather  == false) RxWeather  = obtain_wx_data(client, "weather");
-        if (RxForecast == false) RxForecast = obtain_wx_data(client, "forecast");
+        //if (RxWeather  == false) RxWeather  = obtain_wx_data(client, "weather");
+        //if (RxWeather  == false) RxWeather  = obtain_wx_data_accuweather(client, "currentconditions");
+        if (RxWeather  == false) RxWeather = obtain_wx_data_climacell(secureClient, "current,1h", &current_time, 24);
+        if (RxForecast  == false) RxForecast = obtain_wx_data_climacell(secureClient, "1d", &current_time, 24);
+
+        //if (RxForecast == false) RxForecast = obtain_wx_data(client, "forecast");
         Attempts++;
       }
       if (RxWeather && RxForecast) { // Only if received both Weather or Forecast proceed
@@ -202,7 +209,7 @@ void DisplayWeather() {             // 2.13" e-paper display is 250x122 useable 
 #if DRAW_GRID
   Draw_Grid();
 #endif
-  UpdateLocalTime();
+  //UpdateLocalTime(); // already done in setup
   Draw_Heading_Section();           // Top line of the display
   Draw_Main_Weather_Section();      // Centre section of display for Location, temperature, Weather report, Wx Symbol and wind direction
   //Gak, each forecast is about 50 wide, which means we can fit about 5 of them onto our 250 wide screen.
@@ -518,32 +525,32 @@ boolean SetupTime() {
 }
 //#########################################################################################
 boolean UpdateLocalTime() {
-  struct tm timeinfo;
   char   time_output[30], day_output[30], update_time[30];
-  while (!getLocalTime(&timeinfo, 5000)) { // Wait for 5-sec for time to synchronise
+  while (!getLocalTime(&current_time, 5000)) { // Wait for 5-sec for time to synchronise
     Serial.println("Failed to obtain time");
     return false;
   }
-  CurrentHour = timeinfo.tm_hour;
-  CurrentMin  = timeinfo.tm_min;
-  CurrentSec  = timeinfo.tm_sec;
+  CurrentHour = current_time.tm_hour;
+  CurrentMin  = current_time.tm_min;
+  CurrentSec  = current_time.tm_sec;
+  Serial.print("IsDst:"); Serial.println(current_time.tm_isdst);
   //See http://www.cplusplus.com/reference/ctime/strftime/
-  Serial.println(&timeinfo, "%a %b %d %Y   %H:%M:%S");      // Displays: Saturday, June 24 2017 14:05:49
+  Serial.println(&current_time, "%a %b %d %Y   %H:%M:%S");      // Displays: Saturday, June 24 2017 14:05:49
   if (Units == "M") {
     if ((Language == "CZ") || (Language == "DE") || (Language == "NL") || (Language == "PL") || (Language == "GR"))  {
-      sprintf(day_output, "%s, %02u. %s %02u", weekday_D[timeinfo.tm_wday], timeinfo.tm_mday, month_M[timeinfo.tm_mon], (timeinfo.tm_year) % 100); // day_output >> So., 23. Juni 19 <<
+      sprintf(day_output, "%s, %02u. %s %02u", weekday_D[current_time.tm_wday], current_time.tm_mday, month_M[current_time.tm_mon], (current_time.tm_year) % 100); // day_output >> So., 23. Juni 19 <<
     }
     else
     {
-      sprintf(day_output, "%s  %02u-%s-%02u", weekday_D[timeinfo.tm_wday], timeinfo.tm_mday, month_M[timeinfo.tm_mon], (timeinfo.tm_year) % 100);
+      sprintf(day_output, "%s  %02u-%s-%02u", weekday_D[current_time.tm_wday], current_time.tm_mday, month_M[current_time.tm_mon], (current_time.tm_year) % 100);
     }
-    strftime(update_time, sizeof(update_time), "%H:%M", &timeinfo);  // Creates: '@ 14:05', 24h, no am or pm or seconds.   and change from 30 to 8 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    strftime(update_time, sizeof(update_time), "%H:%M", &current_time);  // Creates: '@ 14:05', 24h, no am or pm or seconds.   and change from 30 to 8 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     sprintf(time_output, "%s", update_time);
   }
   else
   {
-    strftime(day_output, sizeof(day_output), "%a %b-%d-%y", &timeinfo); // Creates  'Sat May-31-2019'
-    strftime(update_time, sizeof(update_time), "%H:%M", &timeinfo);        // Creates: '@ 02:05' - 24h, no seconds or am/pm
+    strftime(day_output, sizeof(day_output), "%a %b-%d-%y", &current_time); // Creates  'Sat May-31-2019'
+    strftime(update_time, sizeof(update_time), "%H:%M", &current_time);        // Creates: '@ 02:05' - 24h, no seconds or am/pm
     sprintf(time_output, "%s", update_time);
   }
   date_str = day_output;
