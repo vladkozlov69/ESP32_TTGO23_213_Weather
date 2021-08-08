@@ -7,39 +7,42 @@
 #include <Preferences.h>
 #include <ESPAsyncWebServer.h>
 
-static uint8_t WIFI_PROTOS[4] = {
-    0,
-    WIFI_PROTOCOL_11B,
-    WIFI_PROTOCOL_11B + WIFI_PROTOCOL_11G,
-    WIFI_PROTOCOL_11G
-};
+typedef struct {
+    String ssid;
+    String pass;
+    int gmt_offset;
+    int dst_offset;
+    String posix_tz;
+    String owm_key;
+    String accu_key;
+    String accu_loc;
+    String climacell_key;
+    String latitude;
+    String longitude;
+    String iana_tz;
+} NetworkSettings;
 
 class NetworkManager
 {
 private:
     Stream * m_Debug;
     Preferences * m_Prefs;
-    uint8_t m_WifiProtocol = 0;
+    NetworkSettings * m_Settings;
 
     void (*m_NmStatusCallbackFunc)(int);
     AsyncWiFiManager * wm = NULL;
     WiFiClient espClient;    
-    int failure_count_network = 0;
 public:
     AsyncWebServer * m_WebServer;
     DNSServer * m_DnsServer;
 public:
-    NetworkManager(Preferences * prefs, Stream * debug);   
+    NetworkManager(Preferences * prefs, Stream * debug, NetworkSettings * settings);   
+    void loadSettings();
     void begin();
-    void loop();
     void reset();
-private:
-    void reinit_wifi();
-    void forceWifiProtocol();
-    void disconnection_handling(int failure_number);
-    void restartESP();
-    void callback(char* topic, byte* payload, unsigned int length) {}
 };
+
+
 
 
 

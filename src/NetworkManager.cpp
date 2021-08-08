@@ -1,9 +1,10 @@
 #include <NetworkManager.h>
 
-NetworkManager::NetworkManager(Preferences * prefs, Stream * debug)
+NetworkManager::NetworkManager(Preferences * prefs, Stream * debug, NetworkSettings * settings)
 {
     m_Prefs = prefs;
     m_Debug = debug;
+    m_Settings = settings;
 }
 
 void NetworkManager::begin()
@@ -13,40 +14,37 @@ void NetworkManager::begin()
 
     wm = new AsyncWiFiManager(m_WebServer, m_DnsServer);
 
-    WiFi.mode(WIFI_STA); 
-    char ssid[20];
-    char pass[20];
-    int ssid_len = 0;
-
-    m_Prefs->begin("network");
-    // m_Prefs->clear();
-    // wm.erase(true);
-    ssid_len = m_Prefs->getString("n_ssid", ssid, sizeof(ssid));
-    m_Prefs->getString("n_pass", pass, sizeof(pass));
-    m_Prefs->end();
-
-    String mac = WiFi.macAddress();
-    mac.replace(":", "");
-
-    wm->resetSettings();
     if (m_Debug)
     {
-        m_Debug->println(F("Starting autoconnect..."));
+        m_Debug->println(F("Starting ConfigPortal..."));
     }
-    AsyncWiFiManagerParameter owm_key("owm_key", "mqtt server", "", 40);
-    AsyncWiFiManagerParameter accu_key("accu_key", "mqtt prefix", mac.c_str(), 40);
-    AsyncWiFiManagerParameter climacell_key("climacell_key", "mqtt prefix", mac.c_str(), 40);
-    // latlong
-    // owm tz
-    // accuLocation
-    // climacellTimezone
-    // gmtOffset_sec
-    // daylightOffset_sec
 
-    wm->addParameter(&owm_key);
-    wm->addParameter(&accu_key);
-    wm->addParameter(&climacell_key);
-    if(wm->startConfigPortal("AutoConnectAP"))
+    AsyncWiFiManagerParameter wmp_gmtOffset(    "gmtOffset",     "GMT Offset, H",   String(m_Settings->gmt_offset).c_str(),  2);
+    AsyncWiFiManagerParameter wmp_dstOffset(    "dstOffset",     "DST Offset, H",   String(m_Settings->dst_offset).c_str(),  2);
+    AsyncWiFiManagerParameter wmp_posixTZ(      "posixTZ",       "posixTZ",         m_Settings->posix_tz.c_str(),  40);
+    AsyncWiFiManagerParameter wmp_owm_key(      "owm_key",       "OWM API Key",     m_Settings->owm_key.c_str(),  40);
+    AsyncWiFiManagerParameter wmp_accu_key(     "accu_key",      "AccuWeather Key", m_Settings->accu_key.c_str(),  40);
+    AsyncWiFiManagerParameter wmp_accu_loc(     "accu_loc",      "AccuWeather Loc", m_Settings->accu_loc.c_str(),  40);
+    AsyncWiFiManagerParameter wmp_climacell_key("climacell_key", "Climacell Key",   m_Settings->climacell_key.c_str(),  40);
+    AsyncWiFiManagerParameter wmp_lat(          "latitude",      "Latitude",        m_Settings->latitude.c_str(),  40);
+    AsyncWiFiManagerParameter wmp_long(         "longitude",     "Longitude",       m_Settings->longitude.c_str(),  40);
+    AsyncWiFiManagerParameter wmp_iana_tz(      "iana_tz",       "IANA Timezone",   m_Settings->iana_tz.c_str(),  40);
+
+
+    wm->addParameter(&wmp_gmtOffset);
+    wm->addParameter(&wmp_dstOffset);
+    wm->addParameter(&wmp_posixTZ);
+    wm->addParameter(&wmp_owm_key);
+    wm->addParameter(&wmp_accu_key);
+    wm->addParameter(&wmp_accu_loc);
+    wm->addParameter(&wmp_climacell_key);
+    wm->addParameter(&wmp_lat);
+    wm->addParameter(&wmp_long);
+    wm->addParameter(&wmp_iana_tz);
+
+    wm->setTryConnectDuringConfigPortal(false);
+
+    if(wm->startConfigPortal("ConfigPortalAP"))
     {
         if (m_Debug)
         {
@@ -58,22 +56,21 @@ void NetworkManager::begin()
         }
 
         m_Prefs->begin("network");
-        m_Prefs->putString("n_ssid", WiFi.SSID().c_str());
-        m_Prefs->putString("n_pass", WiFi.psk().c_str());
+        m_Prefs->putString("n_ssid",        WiFi.SSID().c_str());
+        m_Prefs->putString("n_pass",        WiFi.psk().c_str());
+        m_Prefs->putInt("gmt_offset",       String(wmp_gmtOffset.getValue()).toInt());
+        m_Prefs->putInt("dst_offset",       String(wmp_dstOffset.getValue()).toInt());
+        m_Prefs->putString("posix_tz",      wmp_posixTZ.getValue());
+        m_Prefs->putString("owm_key",       wmp_owm_key.getValue());
+        m_Prefs->putString("accu_key",      wmp_accu_key.getValue());
+        m_Prefs->putString("accu_loc",      wmp_accu_loc.getValue());
+        m_Prefs->putString("climacell_key", wmp_climacell_key.getValue());
+        m_Prefs->putString("latitude",      wmp_lat.getValue());
+        m_Prefs->putString("longitude",     wmp_long.getValue());
+        m_Prefs->putString("iana_tz",       wmp_iana_tz.getValue());
         m_Prefs->end();
 
-        if (strlen(custom_mqtt_server.getValue()) > 0)
-        {
-            if (m_Debug)
-            {
-                m_Debug->print(F("Saving mqtt:"));
-                m_Debug->println(custom_mqtt_server.getValue());
-            }
-            m_Prefs->begin("network");
-            m_Prefs->putString("n_mqtt", custom_mqtt_server.getValue());
-            m_Prefs->putString("n_mpfx", custom_mqtt_prefix.getValue());
-            m_Prefs->end();
-        }
+        loadSettings();
     } 
     else 
     {
@@ -84,35 +81,28 @@ void NetworkManager::begin()
     }
 }
 
-void NetworkManager::loop()
+void NetworkManager::loadSettings() 
 {
-    if (WiFi.status() == WL_CONNECTED) 
+    m_Prefs->begin("network");
+    m_Settings->ssid          = m_Prefs->getString("n_ssid",        m_Settings->ssid);
+    m_Settings->pass          = m_Prefs->getString("n_pass",        m_Settings->pass);
+    m_Settings->gmt_offset    = m_Prefs->getInt("gmt_offset",       m_Settings->gmt_offset);
+    m_Settings->dst_offset    = m_Prefs->getInt("dst_offset",       m_Settings->dst_offset);
+    m_Settings->posix_tz      = m_Prefs->getString("posix_tz",      m_Settings->posix_tz);
+    m_Settings->owm_key       = m_Prefs->getString("owm_key",       m_Settings->owm_key);
+    m_Settings->accu_key      = m_Prefs->getString("accu_key",      m_Settings->accu_key);
+    m_Settings->accu_loc      = m_Prefs->getString("accu_loc",      m_Settings->accu_loc);
+    m_Settings->climacell_key = m_Prefs->getString("climacell_key", m_Settings->climacell_key);
+    m_Settings->latitude      = m_Prefs->getString("latitude",      m_Settings->latitude);
+    m_Settings->longitude     = m_Prefs->getString("longitude",     m_Settings->longitude);
+    m_Settings->iana_tz       = m_Prefs->getString("iana_tz",       m_Settings->iana_tz);
+    m_Prefs->end();
+    if (m_Debug)
     {
-        // dnsHelper.loop();
-        m_NmStatusCallbackFunc(1000);
-        failure_count_network = 0;
-
-        // if (mqttReady())
-        // {
-        //     if (millis() - m_LastSent > 60000)
-        //     {
-        //         m_MqttSendCallbackFunc(mqttClient, mqttPrefix.c_str());
-        //         updateStats();
-        //         m_LastSent = millis();
-        //     }
-        // }
-
-        // AsyncElegantOTA.loop();
-    }
-    else 
-    { 
-        if (m_Debug)
-        {
-            m_Debug->println(F("Wifi disconnected"));
-        }
-        m_NmStatusCallbackFunc(100);
-        failure_count_network++;
-        disconnection_handling(failure_count_network);
+        m_Debug->print("Loaded SSID:");
+        m_Debug->println(m_Settings->ssid);
+        m_Debug->print("Loaded PASS:");
+        m_Debug->println(m_Settings->pass);
     }
 }
 
@@ -121,67 +111,11 @@ void NetworkManager::reset()
     m_Prefs->begin("network");
     m_Prefs->clear();
     m_Prefs->end();
-#ifdef ESP32
     WiFi.disconnect(true, true);
-#endif
-#ifdef ESP8266
-    wm->resetSettings();
-#endif
 }
 
-void NetworkManager::restartESP()
-{
-    ESP.restart();
-}
-
-void NetworkManager::disconnection_handling(int failure_number) 
-{
-    if (failure_number > 12)
-    {
-        if (m_Debug)
-        {
-            m_Debug->println(F("Restarting esp32..."));
-        }
-        restartESP();
-    }
-
-    delay(100);
-
-    if (m_Debug)
-    {
-        m_Debug->println(F("Reconnecting esp32 wifi..."));
-    }
 
 
-    #ifdef ESP32
-    int index = (failure_number/10) % 4;
-    m_WifiProtocol = WIFI_PROTOS[index];
-    reinit_wifi();
-    #else
-    WiFi.disconnect();
-    WiFi.reconnect();
-    #endif
-}
 
-void NetworkManager::forceWifiProtocol() 
-{
-    #ifdef ESP32
-    if (m_Debug)
-    {
-        m_Debug->print(F("ESP32: Forcing to wifi ")); m_Debug->println(m_WifiProtocol);
-    }
-    esp_wifi_set_protocol(WIFI_IF_STA, m_WifiProtocol);
-    #endif
-}
-
-void NetworkManager::reinit_wifi() 
-{
-    #ifdef ESP32
-    delay(10);
-    WiFi.mode(WIFI_STA);
-    if (m_WifiProtocol) forceWifiProtocol();
-    WiFi.begin();
-    #endif
-}
 
 

@@ -46,9 +46,9 @@
 enum alignmentType {LEFT, RIGHT, CENTER};
 
 #define DONE_PIN 21
-#define SETUP_PIN 34
+#define SETUP_PIN 15 //34
 
-#define USE_OWM 1
+//#define USE_OWM 1
 //#define USE_CLIMACELL 1
 //#define USE_ACCUWEATHER 1
 
@@ -161,7 +161,8 @@ int  SleepTime     = 23; // Sleep after (23+1) 00:00 to save battery power
 
 Preferences preferences;
 
-NetworkManager nm(&preferences, &Serial);
+NetworkSettings settings;
+NetworkManager nm(&preferences, &Serial, &settings);
 
 
 //#########################################################################################
@@ -172,11 +173,15 @@ void setup() {
   StartTime = millis();
   Serial.begin(115200);
 
-  if ( true || digitalRead(SETUP_PIN) == LOW)
+  nm.loadSettings();
+  Serial.print("SETUP_PIN:");
+  Serial.println(digitalRead(SETUP_PIN));
+
+  if (digitalRead(SETUP_PIN) == LOW || settings.ssid.length() == 0)
   {
     setupDeviceSettings();
     ESP.restart();
-  }
+  } 
 
   //delay(5000);
   if (StartWiFi() == WL_CONNECTED && SetupTime() == true) {
@@ -184,17 +189,39 @@ void setup() {
       Serial.println("Initialising Display");
       InitialiseDisplay(); // Give screen time to initialise by getting weather data!
       byte Attempts = 1;
-      bool RxWeather = false, RxForecast = false;
+      bool RxWeather = false, RxForecast = false, RxCurrent = false;
       Serial.println("Attempt to get weather");
       WiFiClient client;   // wifi client object
       WiFiClientSecure secureClient;
-      while ((RxWeather == false || RxForecast == false) && Attempts <= 5) { // Try up-to 2 time for Weather and Forecast data
-        //if (RxWeather  == false) RxWeather  = obtain_wx_data(client, "weather");
-        //if (RxWeather  == false) RxWeather  = obtain_wx_data_accuweather(client, "currentconditions");
-        if (RxWeather  == false) RxWeather = obtain_wx_data_climacell(secureClient, "current,1h", &current_time, 24);
-        if (RxForecast  == false) RxForecast = obtain_wx_data_climacell(secureClient, "1d", &current_time, 24);
+      while ((RxWeather == false || RxForecast == false || RxCurrent == false) && Attempts <= 5) 
+      { 
+        // Try up-to 2 time for Weather and Forecast data
+        if (settings.climacell_key.length() > 0)
+        {
+          if (RxWeather  == false) RxWeather = obtain_wx_data_climacell(secureClient, "current,1h", &current_time, 24, 
+            settings.climacell_key, settings.latitude, settings.longitude, settings.iana_tz);
+          if (RxForecast  == false) RxForecast = obtain_wx_data_climacell(secureClient, "1d", &current_time, 24,
+            settings.climacell_key, settings.latitude, settings.longitude, settings.iana_tz);
+        }
 
-        //if (RxForecast == false) RxForecast = obtain_wx_data(client, "forecast");
+        if (settings.owm_key.length() > 0)
+        {
+          if (RxWeather  == false) RxWeather  = obtain_wx_data_owm(client, "onecall", 
+            settings.latitude, settings.longitude, settings.owm_key);
+          if (RxForecast == false) RxForecast = obtain_wx_data_owm(client, "forecast",
+            settings.latitude, settings.longitude, settings.owm_key);
+        }
+
+        if (settings.accu_key.length() > 0 && settings.accu_loc.length() > 0)
+        {
+          if (RxCurrent  == false) RxCurrent  = obtain_wx_data_accuweather(client, "currentconditions", 
+            settings.accu_loc, settings.accu_key);
+        }
+        else
+        {
+          RxCurrent = true;
+        }
+      
         Attempts++;
       }
       if (RxWeather && RxForecast) { // Only if received both Weather or Forecast proceed
@@ -209,7 +236,7 @@ void setup() {
 }
 //#########################################################################################
 void loop() { // this will never run!
-  nm.loop();  
+  
 }
 //#########################################################################################
 void BeginSleep() {
@@ -274,7 +301,7 @@ void Draw_Grid() {
 void Draw_Heading_Section() {
   u8g2Fonts.setFont(u8g2_font_helvB08_tf);
   //display.drawRect(0,0,SCREEN_WIDTH,SCREEN_HEIGHT,GxEPD_BLACK);
-  drawString(95, 1, City, LEFT);
+  //drawString(95, 1, City, LEFT); // FIXME
   drawString(0, 1, time_str, LEFT);
   drawString(SCREEN_WIDTH, 1, date_str, RIGHT);
   display.drawLine(0, 11, SCREEN_WIDTH, 11, GxEPD_BLACK);
@@ -505,13 +532,13 @@ void DisplayWXicon(int x, int y, String IconName, bool IconSize) {
 }
 //#########################################################################################
 uint8_t StartWiFi() {
-  Serial.print("\r\nConnecting to: "); Serial.println(String(ssid));
+  Serial.print("\r\nConnecting to: "); Serial.println(settings.ssid);
   IPAddress dns(8, 8, 8, 8); // Google DNS
   WiFi.disconnect();
   WiFi.mode(WIFI_STA); // switch off AP
   WiFi.setAutoConnect(true);
   WiFi.setAutoReconnect(true);
-  WiFi.begin(ssid, password);
+  WiFi.begin(settings.ssid.c_str(), settings.pass.c_str());
   unsigned long start = millis();
   uint8_t connectionStatus;
   bool AttemptConnection = true;
@@ -539,8 +566,8 @@ void StopWiFi() {
 }
 //#########################################################################################
 boolean SetupTime() {
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer, "time.nist.gov"); //(gmtOffset_sec, daylightOffset_sec, ntpServer)
-  setenv("TZ", Timezone, 1);  //setenv()adds the "TZ" variable to the environment with a value TimeZone, only used if set to 1, 0 means no change
+  configTime(settings.gmt_offset * 3600, settings.dst_offset * 3600, ntpServer, "time.nist.gov"); //(gmtOffset_sec, daylightOffset_sec, ntpServer)
+  setenv("TZ", settings.posix_tz.c_str(), 1);  //setenv()adds the "TZ" variable to the environment with a value TimeZone, only used if set to 1, 0 means no change
   tzset(); // Set the TZ environment variable
   delay(100);
   bool TimeStatus = UpdateLocalTime();
@@ -923,7 +950,6 @@ void InitialiseDisplay() {
 
 void setupDeviceSettings()
 {
-  nm.reset();
   nm.begin();
 }
 
